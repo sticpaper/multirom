@@ -123,6 +123,11 @@ struct multirom_status
 
     // Runtime variables
     char* auto_boot_name;
+    int bckp_auto_boot_seconds;
+    int bckp_auto_boot_type;
+    char* bckp_curr_rom_part;
+    int bckp_hide_internal;
+    int is_recovery_boot;
 };
 
 int multirom(const char *rom_to_boot);

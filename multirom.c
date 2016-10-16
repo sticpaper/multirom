@@ -66,6 +66,7 @@
 #define NTFS_BIN "ntfs-3g"
 #define EXFAT_BIN "exfat-fuse"
 #define INTERNAL_ROM_NAME "Internal"
+#define INTERNAL_RECOVERY_NAME "Recovery"
 #define MAX_ROM_NAME_LEN 26
 #define LAYOUT_VERSION "/data/.layout_version"
 
@@ -427,7 +428,22 @@ finish:
     nokexec_free_struct();
 #endif
     if (s.enable_kmsg_logging != 0)
+    {
         multirom_kmsg_logging(BACKUP_LATE_KLOG);
+    }
+
+    // Restore the original boot values
+    if (s.is_recovery_boot == 1)
+    {
+        INFO("Restoring boot params before Recovery MultiROM\n");
+        s.auto_boot_rom = NULL;
+        s.auto_boot_seconds = s.bckp_auto_boot_seconds;
+        s.auto_boot_type = s.bckp_auto_boot_type;
+        s.curr_rom_part = s.bckp_curr_rom_part;
+        s.hide_internal = s.bckp_hide_internal;
+        multirom_dump_status(&s);
+    }
+
     multirom_save_status(&s);
     multirom_free_status(&s);
 
@@ -756,6 +772,14 @@ int multirom_load_status(struct multirom_status *s)
 
     fclose(f);
 
+    // Fill the additional runtime settings
+    s->auto_boot_name = strdup(auto_boot_rom);
+    s->is_recovery_boot = 0;
+    s->bckp_auto_boot_seconds = s->auto_boot_seconds;
+    s->bckp_auto_boot_type = s->auto_boot_type;
+    s->bckp_curr_rom_part = (s->curr_rom_part != NULL ? strdup(s->curr_rom_part) : NULL);
+    s->bckp_hide_internal = s->hide_internal;
+
     // Find USB drive if we're booting from it
     auto_boot_len = strlen(s->auto_boot_name);
     if (s->curr_rom_part || auto_boot_len > 0)
@@ -842,7 +866,23 @@ int multirom_load_status(struct multirom_status *s)
             ERROR("Could not find rom %s to auto-boot\n", auto_boot_rom);
     }
 
-    if(s->int_display_name)
+    // Detect TWRP recovery boot
+    if (access("/twres/twrp", F_OK) >= 0)
+    {
+        INFO("Renaming primary boot for Recovery MultiROM\n");
+        s->current_rom = multirom_get_internal(s);
+        s->current_rom->name = realloc(s->current_rom->name, strlen(INTERNAL_RECOVERY_NAME)+1);
+        strcpy(s->current_rom->name, INTERNAL_RECOVERY_NAME);
+        s->auto_boot_rom = s->current_rom;
+        s->auto_boot_seconds = 5;
+        if (s->curr_rom_part) {
+            free(s->curr_rom_part);
+        }
+        s->curr_rom_part = NULL;
+        s->hide_internal = 0;
+        s->is_recovery_boot = 1;
+    }
+    else if (s->int_display_name)
     {
         struct multirom_rom *r = multirom_get_internal(s);
         r->name = realloc(r->name, strlen(s->int_display_name)+1);
@@ -938,6 +978,10 @@ void multirom_dump_status(struct multirom_status *s)
     INFO("  curr_rom_part=%s\n", s->curr_rom_part ? s->curr_rom_part : "NULL");
     INFO("\n");
     INFO("  auto_boot_name=%s\n", s->auto_boot_name);
+    INFO("  bckp_auto_boot_seconds=%d\n", s->bckp_auto_boot_seconds);
+    INFO("  bckp_curr_rom_part=%s\n", s->bckp_curr_rom_part ? s->bckp_curr_rom_part : "NULL");
+    INFO("  bckp_hide_internal=%d\n", s->bckp_hide_internal);
+    INFO("  is_recovery_boot=%d\n", s->is_recovery_boot);
     INFO("\n");
 
     int i;
@@ -958,6 +1002,7 @@ void multirom_free_status(struct multirom_status *s)
     list_clear(&s->partitions, &multirom_destroy_partition);
     list_clear(&s->roms, &multirom_free_rom);
     free(s->auto_boot_name);
+    free(s->bckp_curr_rom_part);
     free(s->curr_rom_part);
     free(s->int_display_name);
     if (s->fstab) fstab_destroy(s->fstab);

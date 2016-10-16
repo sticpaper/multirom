@@ -257,6 +257,12 @@ static int is_charger_mode(void)
     return charger_mode;
 }
 
+static int is_secondary_recovery(void)
+{
+    return (access("/twres/twrp", F_OK) >= 0 && (access("/boot.txt", F_OK) >= 0
+            || access("/bootrec/boot-log.txt", F_OK) >= 0));
+}
+
 static void fixup_symlinks(void)
 {
     static const char *init_links[] = { "/sbin/ueventd", "/sbin/watchdogd" };
@@ -360,6 +366,13 @@ int main(int argc, char *argv[])
     if(is_charger_mode())
     {
         INFO("Charger mode detected, skipping multirom\n");
+        goto run_main_init;
+    }
+
+    // Detect secondary recovery boot
+    if (is_secondary_recovery())
+    {
+        INFO("Secondary recovery detected, skipping multirom\n");
         goto run_main_init;
     }
 
