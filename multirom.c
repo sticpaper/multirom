@@ -1848,27 +1848,27 @@ int multirom_create_media_link(struct multirom_status *s)
     // Booting from an unmountable external partition
     if (external_mount_path[0] != 0)
     {
-        // Select internal media path for 'external_multirom'
+        // Select internal media path for 'MultiROM/external'
         char path_ext[256];
         if (stat("/data/media/0", &info) >= 0)
         {
             snprintf(path_ext, sizeof(path_ext),
-                    "/data/media/0/external_multirom");
+                    "/data/media/0/MultiROM/external");
         }
         else
         {
             snprintf(path_ext, sizeof(path_ext),
-                    "/data/media/external_multirom");
+                    "/data/media/MultiROM/external");
         }
 
         INFO("Preparing to mount '%s' to '%s'\n", external_mount_path,
                 path_ext);
 
-        // Create and set accesses to 'external_multirom' on internal media
+        // Create and set accesses to 'MultiROM/external' on internal media
         mkdir(path_ext, 0770);
         chmod(path_ext, 0770);
 
-        // Bind external partition to internal media 'external_multirom'
+        // Bind external partition to internal media 'MultiROM/external'
         if (mount(external_mount_path, path_ext, external_mount_fs, MS_BIND,
                 "") < 0)
         {
@@ -1880,14 +1880,14 @@ int multirom_create_media_link(struct multirom_status *s)
             return 0;
         }
 
-        // Apply internal media owners for 'external_multirom'
+        // Apply internal media owners for 'MultiROM/external'
         unsigned int media_rw_id = decode_uid("media_rw");
         if (media_rw_id != -1U)
         {
             chown(path_ext, (uid_t)media_rw_id, (gid_t)media_rw_id);
         }
 
-        // Append init restorecon for 'external_multirom' context
+        // Append init restorecon for 'MultiROM/external' context
         char restorecon_ext[64];
         snprintf(restorecon_ext, sizeof(restorecon_ext),
                 "    restorecon %s\n", path_ext);
