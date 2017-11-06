@@ -1850,23 +1850,51 @@ int multirom_create_media_link(struct multirom_status *s)
     {
         // Select internal media path for 'MultiROM/external'
         char path_ext[256];
+        char path_multirom[256];
         if (stat("/data/media/0", &info) >= 0)
         {
             snprintf(path_ext, sizeof(path_ext),
                     "/data/media/0/MultiROM/external");
+            snprintf(path_multirom, sizeof(path_multirom),
+                    "/data/media/0/MultiROM");
         }
         else
         {
             snprintf(path_ext, sizeof(path_ext),
                     "/data/media/MultiROM/external");
+            snprintf(path_multirom, sizeof(path_multirom),
+                    "/data/media/MultiROM");
         }
 
         INFO("Preparing to mount '%s' to '%s'\n", external_mount_path,
                 path_ext);
 
+        // Open MultiROM path and unset immutable
+        int fd = open(path_multirom, O_RDONLY | O_NONBLOCK);
+        long flags;
+        if (fd >= 0) {
+            if (ioctl(fd, FS_IOC_GETFLAGS, &flags) >= 0) {
+                flags &= ~FS_IMMUTABLE_FL;
+                if (ioctl(fd, FS_IOC_SETFLAGS, &flags) >= 0) {
+                    INFO("Removed FS_IMMUTABLE_FL for '%s'\n", path_multirom);
+                } else {
+                    ERROR("Failed to unset FS_IMMUTABLE_FL for '%s': %d (%s)\n",
+                            path_multirom, errno, strerror(errno));
+                    close(fd);
+                    fd = -1;
+                }
+            } else {
+                ERROR("Failed to check FS_IMMUTABLE_FL for '%s': %d (%s)\n",
+                        path_multirom, errno, strerror(errno));
+                close(fd);
+                fd = -1;
+            }
+        }
+
         // Create and set accesses to 'MultiROM/external' on internal media
         mkdir(path_ext, 0770);
         chmod(path_ext, 0770);
+        chown(path_ext, 0, 0);
 
         // Bind external partition to internal media 'MultiROM/external'
         if (mount(external_mount_path, path_ext, external_mount_fs, MS_BIND,
@@ -1893,6 +1921,18 @@ int multirom_create_media_link(struct multirom_status *s)
                 "    restorecon %s\n", path_ext);
         rcadditions_append_trigger(&s->rc, "post-fs-data",
                 restorecon_ext);
+
+        // Restore immutable and close MultiROM path
+        if (fd >= 0) {
+            flags |= FS_IMMUTABLE_FL;
+            if (ioctl(fd, FS_IOC_SETFLAGS, &flags) >= 0) {
+                INFO("Restored FS_IMMUTABLE_FL for '%s'\n", path_multirom);
+            } else {
+                ERROR("Failed to reset FS_IMMUTABLE_FL for '%s': %d (%s)\n",
+                        path_multirom, errno, strerror(errno));
+            }
+            close(fd);
+        }
     }
 
     return 0;
