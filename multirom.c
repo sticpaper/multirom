@@ -2247,8 +2247,8 @@ int multirom_create_media_link(struct multirom_status *s)
         REALDATA"/media",      // 0
         REALDATA"/media/0",    // 1
 
-        "/data/media",         // 2
-        "/data/media/0",       // 3
+        "/data/media/MultiROM_Internal",         // 2
+        "/data/media/0/MultiROM_Internal",       // 3
     };
 
     int from, to;
@@ -2266,6 +2266,7 @@ int multirom_create_media_link(struct multirom_status *s)
         else           to = 2;
     }
 
+    
     ERROR("Making media dir: api %d, media_new %d, %s to %s\n", api_level, media_new, paths[from], paths[to]);
     if(mkdir_recursive(paths[to], 0775) == -1)
     {
@@ -2278,7 +2279,7 @@ int multirom_create_media_link(struct multirom_status *s)
         ERROR("Failed to bind media folder %d (%s)\n", errno, strerror(errno));
         return -1;
     }
-
+    
 #if 0
     if(api_level >= 17)
     {
